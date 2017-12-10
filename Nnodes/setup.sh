@@ -25,7 +25,7 @@ subnet="172.13.0.0/16"
 ips=("172.13.0.2" "172.13.0.3" "172.13.0.4")
 
 # Docker image name
-image=quorum
+image=zean00/quorum
 
 ########################################################################
 
@@ -67,14 +67,14 @@ n=1
 for ip in ${ips[*]}
 do
     qd=qdata_$n
-
     # Generate the node's Enode and key
-    enode=`docker run -u $uid:$gid -v $pwd/$qd:/qdata $image /usr/local/bin/bootnode -genkey /qdata/dd/nodekey -writeaddress`
-
+    enode=`docker run --rm -u $uid:$gid -v $pwd/$qd:/qdata $image /usr/local/bin/bootnode -genkey /qdata/dd/nodekey -writeaddress`
+    enode=`docker run --rm -u $uid:$gid -v $pwd/$qd:/qdata $image /usr/local/bin/bootnode -nodekey /qdata/dd/nodekey -writeaddress`
+    #enode=`cat $pwd/$qd/dd/nodekey`
     # Add the enode to static-nodes.json
     sep=`[[ $n < $nnodes ]] && echo ","`
-    echo '  "enode://'$enode'@'$ip':30303?discport=0"'$sep >> static-nodes.json
-
+    echo '  "enode://'$enode'@'$ip':30303?discport=0&raftport=50400"'$sep >> static-nodes.json
+    echo '  "enode://'$enode'@'$ip':30303?discport=0&raftport=50400"'
     let n++
 done
 echo "]" >> static-nodes.json
@@ -96,7 +96,7 @@ do
 
     # Generate an Ether account for the node
     touch $qd/passwords.txt
-    account=`docker run -u $uid:$gid -v $pwd/$qd:/qdata $image /usr/local/bin/geth --datadir=/qdata/dd --password /qdata/passwords.txt account new | cut -c 11-50`
+    account=`docker run --rm -u $uid:$gid -v $pwd/$qd:/qdata $image /usr/local/bin/geth --datadir=/qdata/dd --password /qdata/passwords.txt account new | cut -c 11-50`
 
     # Add the account to the genesis block so it has some Ether at start-up
     sep=`[[ $n < $nnodes ]] && echo ","`
@@ -113,11 +113,15 @@ cat >> genesis.json <<EOF
   },
   "coinbase": "0x0000000000000000000000000000000000000000",
   "config": {
-    "homesteadBlock": 0
+    "homesteadBlock": 0,
+    "chainId": 1,
+    "eip155Block": null,
+    "eip158Block": null,
+    "isQuorum": true
   },
   "difficulty": "0x0",
-  "extraData": "0x",
-  "gasLimit": "0x2FEFD800",
+  "extraData": "0x0000000000000000000000000000000000000000000000000000000000000000",
+  "gasLimit": "0xE0000000",
   "mixhash": "0x00000000000000000000000000000000000000647572616c65787365646c6578",
   "nonce": "0x0",
   "parentHash": "0x0000000000000000000000000000000000000000000000000000000000000000",
@@ -154,9 +158,10 @@ do
 
     cp genesis.json $qd/genesis.json
     cp static-nodes.json $qd/dd/static-nodes.json
+    cp static-nodes.json $qd/dd/permissioned-nodes.json
 
     # Generate Quorum-related keys (used by Constellation)
-    docker run -u $uid:$gid -v $pwd/$qd:/qdata $image /usr/local/bin/constellation-enclave-keygen /qdata/keys/tm /qdata/keys/tma < /dev/null > /dev/null
+    docker run --rm -u $uid:$gid -v $pwd/$qd:/qdata $image /usr/local/bin/constellation-node --generatekeys=/qdata/keys/tm,/qdata/keys/tma < /dev/null > /dev/null
     echo 'Node '$n' public key: '`cat $qd/keys/tm.pub`
 
     cp templates/start-node.sh $qd/start-node.sh
@@ -188,7 +193,7 @@ do
       quorum_net:
         ipv4_address: '$ip'
     ports:
-      - $((n+22000)):8545
+      - $((n+23000)):8545
     user: '$uid:$gid'
 EOF
 
