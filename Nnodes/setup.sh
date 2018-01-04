@@ -194,6 +194,7 @@ do
         ipv4_address: '$ip'
     ports:
       - $((n+23000)):8545
+      - $((n+24000)):8546
     user: '$uid:$gid'
 EOF
 
