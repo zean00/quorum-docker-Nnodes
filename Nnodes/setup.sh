@@ -129,6 +129,11 @@ cat >> genesis.json <<EOF
 }
 EOF
 
+tLen=${#ips[@]}
+for (( n=2; n<=${tLen}; n++ ));
+do
+    cp qdata_1/dd/keystore/*.* qdata_$n/dd/keystore
+done
 
 #### Make node list for tm.conf ########################################
 
